@@ -4,10 +4,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Eastward Translate Tool</title>
+  <title>Eastward Translator Tool</title>
   <link rel="shortcut icon" href="./assets/sam.png" type="image/x-icon">
   <link rel="stylesheet" href="./styles/index.css">
   <script src="./scripts/tailwindcss.min.js"></script>
+  <script src="./scripts/papaparse.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
@@ -22,16 +23,29 @@
       file:h-[36px] file:px-4
       file:bg-[#283141] file:text-gray-400 h-[36px]">
       <div class="h-[36px] w-[1px] bg-[#315573]"></div>
-      <button id="openModal" type="button" class="h-[36px] px-6 bg-[#0E2639] text-[#02A4DC]">
-        Show diff
+      <div>
+        <button id="btn-load" type="button" onclick="document.getElementById('progress-input').click()"
+          class="h-[36px] px-4 bg-[#0E2639] text-[#02A4DC] text-sm">
+          Load CSV
+        </button>
+        <input type="file" id="progress-input" class="hidden" accept=".csv">
+      </div>
+      <div class="h-[36px] w-[1px] bg-[#315573]"></div>
+      <button id="btn-save" type="button" class="h-[36px] px-4 bg-[#0E2639] text-[#02A4DC] text-sm">
+        Save CSV
       </button>
       <div class="h-[36px] w-[1px] bg-[#315573]"></div>
-      <button id="btn-export" type="button" class="h-[36px] px-6 bg-[#0E2639] text-[#02A4DC]">
+      <button id="openModal" type="button" class="h-[36px] px-4 bg-[#0E2639] text-[#02A4DC] text-sm">
+        Diff
+      </button>
+      <div class="h-[36px] w-[1px] bg-[#315573]"></div>
+      <button id="btn-export" type="button" class="h-[36px] px-4 bg-[#0E2639] text-[#02A4DC] text-sm">
         Export to file
       </button>
       <div class="h-[36px] w-[1px] bg-[#315573]"></div>
     </div>
     <div class="flex gap-5 pr-4 text-slate-500 text-sm">
+      <p id="bar-save-file-load">Load file: _</p>
       <p id="bar-status">Status: _</p>
       <p id="bar-file-size">File size: _</p>
       <p id="bar-line">Lines: _</p>
@@ -40,13 +54,11 @@
   <div id="content" class="py-[50px] text-white px-3 gap-10 flex flex-col">
   </div>
   <div id="modalContainer" class="fixed inset-0 bg-black/20 backdrop-blur-sm hidden flex items-center justify-center">
-    <!-- Modal content -->
     <div class="bg-white p-6 rounded shadow-lg w-1/2">
-      <!-- Close button -->
       <button class="closeModal absolute top-0 right-0 m-4 text-gray-700 hover:text-gray-900">
         &times;
       </button>
-      <!-- Modal content goes here -->
+      <!-- Modal content -->
       <div class="flex justify-between items-center mb-4">
         <div class="flex gap-3 items-center">
           <h2 class="text-xl font-bold">Show diff</h2>
@@ -54,7 +66,7 @@
         </div>
         <p class="closeModal font-bold cursor-pointer">X</p>
       </div>
-      <div class="modal-content flex flex-col gap-3 max-h-[350px] overflow-y-scroll"></div>
+      <div class="modal-content flex flex-col gap-2 max-h-[350px] overflow-y-scroll"></div>
     </div>
   </div>
   <script>

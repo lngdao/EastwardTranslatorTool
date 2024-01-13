@@ -1,5 +1,7 @@
 let _rawData;
 let _jsonData;
+let _csvData;
+let _jsonSaveData;
 let _numberOfLines;
 let _rawTranslated = {};
 let _userTranslates = {};
@@ -38,19 +40,19 @@ function parseRawDataTojsonData(data) {
 }
 
 function handleTranslateGG(ele) {
-  const _entry = ele.getAttribute('data-entry');
-  const isTranslated = _rawTranslated.hasOwnProperty(_entry);
+  const entry = ele.getAttribute('data-entry');
+  const isTranslated = _rawTranslated.hasOwnProperty(entry);
 
   if (isTranslated) {
-    ele.innerText = `Original: ${_rawTranslated[_entry].raw}`;
-    delete _rawTranslated[_entry];
+    ele.innerText = `Original: ${_rawTranslated[entry].raw}`;
+    delete _rawTranslated[entry];
     return;
   }
 
-  const _text = ele.innerText.slice(10); // ignore Original:
+  const textSource = ele.innerText.slice(10); // ignore Original:
 
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${encodeURI(
-    _text
+    textSource
   )}`;
 
   const xhttp = new XMLHttpRequest();
@@ -60,8 +62,8 @@ function handleTranslateGG(ele) {
       const translations = responseReturned[0].map((text) => text[0]);
       const outputText = translations.join(' ');
 
-      _rawTranslated[_entry] = {
-        raw: _text,
+      _rawTranslated[entry] = {
+        raw: textSource,
         trans: outputText,
       };
       ele.innerText = `Original: ${outputText}`;
@@ -71,9 +73,9 @@ function handleTranslateGG(ele) {
   xhttp.send();
 }
 
-function jsonToTable(jsonData) {
+function render(jsonData) {
   let tableData;
-  let _line = 0;
+  let line = 0;
 
   tableData = Object.keys(jsonData)
     .map(
@@ -83,18 +85,18 @@ function jsonToTable(jsonData) {
       <div class="flex flex-col gap-6 mt-2">
         ${Object.keys(jsonData[key])
           .map((entry) => {
-            _line++;
+            line++;
             return `<div class="flex flex-col gap-1">
               <div class="flex items-center gap-3">
-                <p class="text-[#558ab5]">~Line ${_line}: [${entry}]</p>
+                <p class="text-[#558ab5]">~Line ${line}: [${entry}]</p>
                 <div data-key="${key}" data-entry="${entry}" class="items-center gap-1 flex btn-trans px-2 py-[2px] bg-[#3877ab] text-[11px] text-semibold rounded-full cursor-pointer">
                     Machine Translate <span><img class="w-[10px] h-[10px]" src='./assets/bi_google.png'/></span>
                 </div>
               </div>
               <p data-key="${key}" data-entry="${entry}" class="max-w-[85%]">Original: ${jsonData[key][entry]}</p>
-              <div class="flex gap-2 items-center">
-                <p>Translate:</p>
-                <input data-key="${key}" data-entry="${entry}" autocomplete="off" name="translate" class="input-translate w-1/2 px-4 py-1 border-b-[1px] border-slate-700 outline-none focus:border-gray-400 bg-transparent" placeholder="translate" />
+              <div class="flex gap-2">
+                <p class="self-end">Translate:</p>
+                <input data-key="${key}" data-entry="${entry}" autocomplete="off" name="translate" class="input-translate w-1/2 px-2 py-1 border-b-[1px] border-slate-700 outline-none focus:border-gray-400 bg-transparent" placeholder="translate" />
               </div>
             </div>`;
           })
@@ -114,56 +116,37 @@ function updateEditStatus() {
   document.getElementById('bar-status').innerText = `Status: ${status}`;
 }
 
-document.getElementById('file-input').addEventListener('change', (e) => {
-  const file = e.target.files[0];
+function calcFileSize(file) {
   let size = file.size.toString();
 
   if (size.length < 7) size = `${Math.round(+size / 1024).toFixed(2)}kb`;
   else size`${(Math.round(+size / 1024) / 1000).toFixed(2)}MB`;
 
-  document.getElementById('bar-file-size').innerText = `File size: ${size}`;
+  return size;
+}
 
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    _isLoadFile = true;
-    _rawData = e.target.result;
-    let jsonData = parseRawDataTojsonData(e.target.result);
-    document.getElementById('content').innerHTML = jsonToTable(jsonData);
+function genCsvFileName() {
+  const now = new Date();
 
-    // add event translate for original text
-    document.querySelectorAll('.btn-trans').forEach((el) =>
-      el.addEventListener('click', () => {
-        const targetTextEl = el.parentElement.nextElementSibling;
+  const day = now.getDate().toString().padStart(2, '0');
+  const month = (now.getMonth() + 1).toString().padStart(2, '0'); // Tháng bắt đầu từ 0
+  const year = now.getFullYear();
 
-        handleTranslateGG(targetTextEl);
-      })
-    );
+  const hours = now.getHours().toString().padStart(2, '0');
+  const minutes = now.getMinutes().toString().padStart(2, '0');
 
-    document.querySelectorAll('input.input-translate').forEach((el) => {
-      el.addEventListener('input', () => {
-        _isEdited = true;
-        updateEditStatus();
-        if (el.value.length) {
-          const key = el.getAttribute('data-key');
-          const entry = el.getAttribute('data-entry');
-          _userTranslates[key][entry] = {
-            raw: _jsonData[key][entry],
-            update: el.value,
-          };
-        }
-      });
-    });
-  };
-  reader.readAsText(file);
-});
+  return `${day}_${month}_${year}-${hours}_${minutes}`;
+}
 
-function downloadFile(luaData) {
-  const blob = new Blob([luaData], { type: 'text/text' });
+function downloadFile(data, fileType) {
+  const blob = new Blob([data], {
+    type: fileType == 'lua' ? 'text/text' : 'text/csv',
+  });
   const url = URL.createObjectURL(blob);
 
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'file_new';
+  a.download = fileType == 'lua' ? 'file_new' : genCsvFileName();
 
   document.body.appendChild(a);
   a.click();
@@ -206,9 +189,94 @@ function convertToLuaData(obj) {
   return 'return ' + processObject(obj, '') + '\n';
 }
 
+function loadSaveProgressFile() {
+  _jsonSaveData.forEach((item) => {
+    if (!item.Translation) return;
+
+    const targetInputEl = document.querySelector(
+      `input[data-key='${item.Key}'][data-entry='${item.Entry}']`
+    );
+
+    targetInputEl.value = item.Translation;
+
+    // Temp solution for input event not firing
+    targetInputEl.dispatchEvent(new InputEvent('input'));
+  });
+}
+
+document.getElementById('file-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  let size = calcFileSize(file);
+
+  document.getElementById('bar-file-size').innerText = `File size: ${size}`;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    _isLoadFile = true;
+    _rawData = e.target.result;
+    let jsonData = parseRawDataTojsonData(e.target.result);
+    document.getElementById('content').innerHTML = render(jsonData);
+
+    // add event translate for original text
+    document.querySelectorAll('.btn-trans').forEach((el) =>
+      el.addEventListener('click', () => {
+        const targetTextEl = el.parentElement.nextElementSibling;
+
+        handleTranslateGG(targetTextEl);
+      })
+    );
+
+    document.querySelectorAll('input.input-translate').forEach((el) => {
+      el.addEventListener('input', () => {
+        _isEdited = true;
+        updateEditStatus();
+        const key = el.getAttribute('data-key');
+        const entry = el.getAttribute('data-entry');
+        if (el.value.length == 0) {
+          delete _userTranslates[key][entry];
+          return;
+        }
+        if (el.value.trim().length) {
+          _userTranslates[key][entry] = {
+            raw: _jsonData[key][entry],
+            update: el.value.trim(),
+          };
+        }
+      });
+    });
+
+    if (_jsonSaveData) loadSaveProgressFile();
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('progress-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+
+  document.getElementById(
+    'bar-save-file-load'
+  ).innerText = `Progress file: ${file.name}`;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    _csvData = e.target.result;
+
+    Papa.parse(_csvData, {
+      header: true,
+      dynamicTyping: true,
+      complete: function (results) {
+        _jsonSaveData = results.data;
+      },
+    });
+
+    loadSaveProgressFile();
+  };
+  reader.readAsText(file);
+});
+
 document.getElementById('btn-export').addEventListener('click', () => {
-  if (!_isLoadFile) {
-    alert('Please choose file first!');
+  if (!_jsonData) {
+    alert('An error occurred, please try again!');
     return;
   }
 
@@ -221,28 +289,25 @@ document.getElementById('btn-export').addEventListener('click', () => {
     }
   });
 
-  downloadFile(convertToLuaData(tempJsonData));
+  downloadFile(convertToLuaData(tempJsonData), 'lua');
 });
 
 document.getElementById('openModal').addEventListener('click', () => {
-  let nums = 0;
+  const nums = Object.keys(_userTranslates).reduce(
+    (acc, curr) => acc + Object.keys(_userTranslates[curr]).length,
+    0
+  );
 
   let diffRender = Object.keys(_userTranslates)
     .map(
       (key) => `
     <div>
-      <div class="text-orange-400 font-semibold">⇝ ${key}</div>
-      <div class="flex flex-col gap-4 mt-2">
-        ${Object.keys(_userTranslates[key])
-          .map((entry) => {
-            nums++;
-            return `<div class="flex flex-col gap-2">
-              <p class="text-[#4779a1]">[${entry}]</p>
-              <p data-key="${key}" data-entry="${entry}">Original: ${_userTranslates[key][entry].raw}</p>
-              <p>Translate: ${_userTranslates[key][entry].update}</p>
-            </div>`;
-          })
-          .join('')}
+      <div class="flex gap-1 items-center text-orange-400 font-semibold">⇝ ${key}
+        <p class="font-normal text-slate-400 text-sm">
+          (${Object.values(_userTranslates[key]).length}/${
+        Object.values(_jsonData[key]).length
+      })
+        </p>
       </div>
     </div>
   `
@@ -250,7 +315,25 @@ document.getElementById('openModal').addEventListener('click', () => {
     .join('');
 
   document.querySelector('.modal-content').innerHTML = diffRender;
-  document.getElementById(
-    'modal-status'
-  ).innerText = `(${nums}/${_numberOfLines ?? '_'})`;
+  document.getElementById('modal-status').innerText = `(${nums}/${
+    _numberOfLines ?? '_'
+  })`;
+});
+
+document.getElementById('btn-save').addEventListener('click', () => {
+  if (!_jsonData) {
+    alert('An error occurred, please try again!');
+    return;
+  }
+
+  const outArrayCsvData = [['Key', 'Entry', 'Raw', 'Translation']];
+
+  document.querySelectorAll('input.input-translate').forEach((el) => {
+    const key = el.getAttribute('data-key');
+    const entry = el.getAttribute('data-entry');
+
+    outArrayCsvData.push([key, entry, _jsonData[key][entry], el.value]);
+  });
+
+  downloadFile(Papa.unparse(outArrayCsvData), 'csv');
 });
